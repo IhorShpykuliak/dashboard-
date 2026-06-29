@@ -1,1 +1,1 @@
-# [dashboard-](https://ihorshpykuliak.github.io/dashboard)
+# [Dashboard](https://ihorshpykuliak.github.io/dashboard)
