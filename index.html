@@ -1,0 +1,250 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: "Segoe UI", sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 6px; font-size: 11px; }
+        .dashboard-grid { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+        .branch-header { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid #3b82f6; }
+        .branch-title { font-size: 13px; font-weight: 700; color: #0f172a; text-transform: uppercase; }
+        .branch-timestamp { font-size: 9px; color: #64748b; }
+        .calendar-row { display: flex; gap: 8px; width: 100%; }
+        .donut-card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; flex: 1; padding: 6px; display: flex; flex-direction: column; align-items: center; position: relative; height: 95px; }
+        .donut-title { font-size: 9px; font-weight: 600; color: #64748b; text-transform: uppercase; margin-bottom: 4px; }
+        .donut-wrapper { position: relative; height: 68px; width: 100%; max-width: 68px; }
+        .donut-center-value { position: absolute; top: 58%; left: 50%; transform: translate(-50%, -50%); font-size: 11px; font-weight: 700; color: #0f172a; text-align: center; white-space: nowrap; }
+        .donut-sub-label { font-size: 7px; color: #94a3b8; font-weight: 600; }
+        .kpi-row { display: flex; gap: 6px; width: 100%; }
+        .kpi-card { flex: 1; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 5px; padding: 6px 8px; display: flex; flex-direction: column; border-left: 3px solid #cbd5e1; }
+        .kpi-card.alert-border { border-left-color: #ef4444; }
+        .kpi-card.success-border { border-left-color: #10b981; }
+        .kpi-card.neutral-border { border-left-color: #3b82f6; }
+        .kpi-label { font-size: 9px; font-weight: 600; color: #64748b; text-transform: uppercase; }
+        .kpi-value { font-size: 13px; font-weight: 700; color: #0f172a; margin-top: 2px; }
+        .widget-panel { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden; width: 100%; }
+        .widget-header { background: #ffffff; padding: 8px 12px; border-bottom: 1px solid #edf2f7; font-weight: 600; color: #475569; font-size: 11px; text-transform: uppercase; }
+        .chart-canvas-wrapper { padding: 8px; position: relative; height: 190px; width: 100%; }
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 10.5px; }
+        th { background: #f8fafc; color: #64748b; font-weight: 600; padding: 6px 8px; border-bottom: 2px solid #e2e8f0; text-transform: uppercase; font-size: 8.5px; }
+        td { padding: 6px 8px; border-bottom: 1px solid #f1f5f9; color: #334155; }
+        tr:hover td { background: #f8fafc; }
+.tab-btn { 
+            background: none; 
+            border: 1px solid #e2e8f0; 
+            border-radius: 4px; 
+            padding: 6px 12px; 
+            font-size: 10px; 
+            cursor: pointer; 
+            color: #64748b; 
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .tab-btn:hover { background: #f1f5f9; }
+        .tab-btn.active { 
+            background: #3b82f6; 
+            color: #fff; 
+            border-color: #3b82f6; 
+        }
+        .total-row { background: #f1f5f9 !important; font-weight: 700; }
+        .pos-metric { color: #16a34a !important; font-weight: 600; }
+        .neg-metric { color: #dc2626 !important; font-weight: 600; }
+        .modal-overlay { display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(2px); }
+        .modal-box { background: #ffffff; margin: 4% auto; padding: 16px; border-radius: 8px; width: 85%; max-width: 900px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.15); animation: slideDown 0.2s ease-out; }
+        .modal-hdr { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 12px; }
+        .modal-txt { font-size: 14px; font-weight: 700; color: #1e293b; text-transform: uppercase; }
+        .modal-close { font-size: 22px; font-weight: 700; color: #94a3b8; cursor: pointer; }
+        .modal-close:hover { color: #475569; }
+        .modal-tables-flex { display: flex; gap: 16px; width: 100%; }
+        .modal-half-pane { flex: 1; min-width: 0; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden; }
+        .modal-half-title { padding: 6px 10px; font-size: 10px; font-weight: 700; color: #ffffff; text-transform: uppercase; text-align: center; }
+        .bg-growth { background: #10b981; }
+        .bg-loss { background: #ef4444; }
+        .modal-scrollable { max-height: 320px; overflow-y: auto; }
+        @keyframes slideDown { from { transform: translateY(-15px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    </style>
+
+    <script>
+        const currentCostCentreName = "Northwood";
+        const customerDataset = {
+            "BM Collected": {
+                growth: [
+                    {name:"Apex Construction Ltd",code:"CUST-A01",cy:12450,py:8200,var:4250},
+                    {name:"Summit Homes Group",code:"CUST-A02",cy:9870,py:5400,var:4470},
+                    {name:"Vista Builders",code:"CUST-A03",cy:15680,py:9200,var:6480},
+                    {name:"Horizon Developments",code:"CUST-A04",cy:8740,py:3100,var:5640}
+                ],
+                loss: [
+                    {name:"Riverside Projects",code:"CUST-L01",cy:6800,py:19200,var:-12400},
+                    {name:"Oakwood Contractors",code:"CUST-L02",cy:12400,py:21500,var:-9100}
+                ]
+            },
+            "BM Delivered": {
+                growth: [
+                    {name:"Pinnacle Builders",code:"CUST-B01",cy:18400,py:9200,var:9200},
+                    {name:"Elite Construction",code:"CUST-B02",cy:15600,py:7300,var:8300}
+                ],
+                loss: [
+                    {name:"Metro Homes Ltd",code:"CUST-BL1",cy:9200,py:27800,var:-18600}
+                ]
+            },
+            "Plumbing & Heating": {
+                growth: [{name:"Swift Plumbing Ltd",code:"PH-001",cy:12400,py:6800,var:5600}],
+                loss: [{name:"Thermal Solutions",code:"PH-L01",cy:5400,py:14200,var:-8800}]
+            },
+            "Showroom": {
+                growth: [{name:"Design & Build Co",code:"SH-001",cy:28500,py:14200,var:14300}],
+                loss: [{name:"Heritage Homes",code:"SH-L01",cy:8900,py:21800,var:-12900}]
+            },
+            "TOTAL": {
+                growth: [
+                    {name:"Apex Construction Ltd",code:"CUST-A01",cy:24800,py:9800,var:15000},
+                    {name:"Summit Homes Group",code:"CUST-A02",cy:19800,py:7600,var:12200}
+                ],
+                loss: [
+                    {name:"Riverside Projects",code:"CUST-L01",cy:12400,py:35600,var:-23200}
+                ]
+            }
+        };
+
+        function openCustomerModal(deptName) {
+            const data = customerDataset[deptName] || customerDataset["TOTAL"];
+            document.getElementById("modalDeptTitle").innerText = deptName + " - Customer Performance";
+            // Growth table
+            let growthHtml = data.growth.map(c => `
+                <tr><td><b>${c.code}</b> - ${c.name}</td>
+                <td>£${Math.round(c.cy).toLocaleString()}</td>
+                <td>£${Math.round(c.py).toLocaleString()}</td>
+                <td class="pos-metric">+£${Math.round(c.var).toLocaleString()}</td></tr>`).join('');
+            // Loss table (similar)
+            let lossHtml = data.loss.map(c => `
+                <tr><td><b>${c.code}</b> - ${c.name}</td>
+                <td>£${Math.round(c.cy).toLocaleString()}</td>
+                <td>£${Math.round(c.py).toLocaleString()}</td>
+                <td class="neg-metric">-£${Math.abs(Math.round(c.var)).toLocaleString()}</td></tr>`).join('');
+            
+            document.getElementById("growthTableBody").innerHTML = growthHtml || "<tr><td colspan='4' style='text-align:center;padding:20px;color:#94a3b8;'>No data</td></tr>";
+            document.getElementById("lossTableBody").innerHTML = lossHtml || "<tr><td colspan='4' style='text-align:center;padding:20px;color:#94a3b8;'>No data</td></tr>";
+            document.getElementById("customerDrilldownModal").style.display = "block";
+        }
+
+        function closeCustomerModal() { document.getElementById("customerDrilldownModal").style.display = "none"; }
+        function showChart(type) {
+            document.getElementById("iqDepartmentChart").style.display = (type === "department") ? "block" : "none";
+            document.getElementById("iqDailySalesChart").style.display = (type === "daily") ? "block" : "none";
+            document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+            document.querySelector(`.tab-btn[data-tab="${type}"]`).classList.add("active");
+        }
+    </script>
+</head>
+<body>
+    <div class="dashboard-grid">
+        <div class="branch-header">
+            <div class="branch-title">NORTHWOOD</div>
+            <div class="branch-timestamp">Prior Month Performance - May 2024</div>
+        </div>
+
+        <div class="calendar-row">
+            <div class="donut-card">
+                <div class="donut-title">Weekdays (Days)</div>
+                <div class="donut-wrapper"><canvas id="weekdaysChart" width="68" height="68"></canvas></div>
+                <div class="donut-center-value">19 / 20<div class="donut-sub-label">CY / PY</div></div>
+            </div>
+            <div class="donut-card">
+                <div class="donut-title">Saturdays (Days)</div>
+                <div class="donut-wrapper"><canvas id="saturdaysChart" width="68" height="68"></canvas></div>
+                <div class="donut-center-value">5 / 5<div class="donut-sub-label">CY / PY</div></div>
+            </div>
+        </div>
+
+        <div class="kpi-row">
+            <div class="kpi-card neutral-border"><div class="kpi-label">Sales (May)</div><div class="kpi-value">£1,245,780</div></div>
+            <div class="kpi-card alert-border"><div class="kpi-label">Var Sales</div><div class="kpi-value">+2.3%</div></div>
+            <div class="kpi-card neutral-border"><div class="kpi-label">Margin %</div><div class="kpi-value">25.8%</div></div>
+            <div class="kpi-card success-border"><div class="kpi-label">Var Margin</div><div class="kpi-value">+2.1%</div></div>
+        </div>
+
+        <div class="widget-panel">
+            <div class="widget-header" style="display:flex;gap:10px;">
+                <button class="tab-btn" data-tab="department" onclick="showChart('department')">Department Breakdown</button>
+                <button class="tab-btn active" data-tab="daily" onclick="showChart('daily')">Total Sales per Day</button>
+            </div>
+            <div class="chart-canvas-wrapper">
+                <canvas id="iqDepartmentChart" style="display:none"></canvas>
+                <canvas id="iqDailySalesChart"></canvas>
+            </div>
+        </div>
+
+        <div class="widget-panel">
+            <div class="widget-header">Department Performance Breakdown</div>
+            <table>
+                <thead>
+                    <tr><th>Department</th><th>Sales CY</th><th>Sales PY</th><th>Sales Var%</th><th>GP CY</th><th>GP Var%</th><th>GP CY%</th><th>GP PY%</th></tr>
+                </thead>
+                <tbody>
+                    <tr onclick="openCustomerModal('BM Collected')"><td>BM Collected</td><td>£392,450</td><td>£371,200</td><td class="pos-metric">+5.7%</td><td>£112,800</td><td class="pos-metric">+8.4%</td><td>28.7%</td><td>27.1%</td></tr>
+                    <tr onclick="openCustomerModal('BM Delivered')"><td>BM Delivered</td><td>£498,200</td><td>£525,800</td><td class="neg-metric">-5.2%</td><td>£98,400</td><td class="pos-metric">+6.9%</td><td>19.8%</td><td>17.5%</td></tr>
+                    <tr onclick="openCustomerModal('Showroom')"><td>Showroom</td><td>£228,900</td><td>£198,400</td><td class="pos-metric">+15.4%</td><td>£63,200</td><td class="pos-metric">+9.2%</td><td>27.6%</td><td>28.9%</td></tr>
+                    <tr class="total-row" onclick="openCustomerModal('TOTAL')"><td><strong>Total (All)</strong></td><td><strong>£1,245,780</strong></td><td><strong>£1,218,900</strong></td><td class="pos-metric">+2.2%</td><td><strong>£308,400</strong></td><td class="pos-metric">+7.8%</td><td><strong>24.8%</strong></td><td><strong>23.1%</strong></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div id="customerDrilldownModal" class="modal-overlay" onclick="if(event.target===this) closeCustomerModal();">
+        <div class="modal-box">
+            <div class="modal-hdr">
+                <div id="modalDeptTitle" class="modal-txt">Department Performance</div>
+                <span class="modal-close" onclick="closeCustomerModal()">×</span>
+            </div>
+            <div class="modal-tables-flex">
+                <div class="modal-half-pane">
+                    <div class="modal-half-title bg-growth">Top Growth</div>
+                    <div class="modal-scrollable">
+                        <table><thead><tr><th>Customer</th><th>CY Sales</th><th>PY Sales</th><th>Variance</th></tr></thead><tbody id="growthTableBody"></tbody></table>
+                    </div>
+                </div>
+                <div class="modal-half-pane">
+                    <div class="modal-half-title bg-loss">Biggest Drops</div>
+                    <div class="modal-scrollable">
+                        <table><thead><tr><th>Customer</th><th>CY Sales</th><th>PY Sales</th><th>Variance</th></tr></thead><tbody id="lossTableBody"></tbody></table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Donut Charts
+        const donutOptions = { responsive: true, maintainAspectRatio: false, cutout: "80%", plugins: { legend: { display: false } } };
+        new Chart(document.getElementById("weekdaysChart").getContext("2d"), { type: "doughnut", data: { labels: ["CY", "PY"], datasets: [{ data: [19, 20], backgroundColor: ["#3b82f6", "#e2e8f0"] }] }, options: donutOptions });
+        new Chart(document.getElementById("saturdaysChart").getContext("2d"), { type: "doughnut", data: { labels: ["CY", "PY"], datasets: [{ data: [5, 5], backgroundColor: ["#6366f1", "#f1f5f9"] }] }, options: donutOptions });
+
+        // Department Chart (fake data)
+        new Chart(document.getElementById("iqDepartmentChart").getContext("2d"), {
+            type: "bar",
+            data: {
+                labels: ['BM Collected','BM Delivered','Showroom'],
+                datasets: [
+                    { label: "CY", data: [392450,498200,228900], backgroundColor: "rgba(59,130,246,0.7)" },
+                    { label: "PY", data: [371200,525800,198400], backgroundColor: "rgba(148,163,184,0.4)" }
+                ]
+            },
+            options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { callback: v => "£" + v.toLocaleString() } } } }
+        });
+
+        // Daily Sales Chart (fake data)
+        new Chart(document.getElementById("iqDailySalesChart").getContext("2d"), {
+            type: "line",
+            data: {
+                labels: ["01","02","03","05","06","07","08","09","10","11","12","13","14","15"],
+                datasets: [
+                    { label: "CY", data: [58400,42100,67200,51800,63400,48900,71200,39500,68100,54200,59800,47300,66500,52100], borderColor: "#6366f1", tension: 0.3, fill: true },
+                    { label: "PY", data: [51200,63800,45100,57200,48900,70100,39200,64500,51800,67300,42100,58900,47200,63400], borderColor: "#94a3b8", borderDash: [5,5] }
+                ]
+            },
+            options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { callback: v => "£" + v.toLocaleString() } } } }
+        });
+    </script>
+</body>
+</html>
